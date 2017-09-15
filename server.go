@@ -23,6 +23,7 @@ type ServerOptions struct {
 	EnablePlaceholder bool
 	Address           string
 	PathPrefix        string
+	SecretToken       string
 	ApiKey            string
 	Mount             string
 	CertFile          string

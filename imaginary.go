@@ -43,6 +43,7 @@ var (
 	aHttpCacheTtl      = flag.Int("http-cache-ttl", -1, "The TTL in seconds")
 	aReadTimeout       = flag.Int("http-read-timeout", 60, "HTTP read timeout in seconds")
 	aWriteTimeout      = flag.Int("http-write-timeout", 60, "HTTP write timeout in seconds")
+	aSecretToken       = flag.String("secret-token", "", "Secret key used against DDoS")
 	aConcurrency       = flag.Int("concurrency", 0, "Throttle concurrency limit per second")
 	aBurst             = flag.Int("burst", 100, "Throttle burst max cache size")
 	aMRelease          = flag.Int("mrelease", 30, "OS memory release interval in seconds")
@@ -78,6 +79,7 @@ Options:
   -http-cache-ttl <num>     The TTL in seconds. Adds caching headers to locally served files.
   -http-read-timeout <num>  HTTP read timeout in seconds [default: 30]
   -http-write-timeout <num> HTTP write timeout in seconds [default: 30]
+  -secret-token <value>     A secret used to protect the service against DDoS
   -enable-url-source        Restrict remote image source processing to certain origins (separated by commas)
   -enable-placeholder       Enable image response placeholder to be used in case of error [default: false]
   -enable-auth-forwarding   Forwards X-Forward-Authorization or Authorization header to the image source server. -enable-url-source flag must be defined. Tip: secure your server from public access to prevent attack vectors
@@ -121,6 +123,7 @@ func main() {
 		EnablePlaceholder: *aEnablePlaceholder,
 		PathPrefix:        *aPathPrefix,
 		ApiKey:            *aKey,
+		SecretToken:       *aSecretToken,
 		Concurrency:       *aConcurrency,
 		Burst:             *aBurst,
 		Mount:             *aMount,

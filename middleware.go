@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"crypto/md5"
+	"encoding/hex"
+	"net/url"
 
 	"github.com/daaku/go.httpgzip"
 	"github.com/rs/cors"
@@ -16,6 +19,9 @@ import (
 func Middleware(fn func(http.ResponseWriter, *http.Request), o ServerOptions) http.Handler {
 	next := http.Handler(http.HandlerFunc(fn))
 
+	if o.SecretToken != "" {
+		next = validateToken(next, o)
+	}
 	if o.Concurrency > 0 {
 		next = throttle(next, o)
 	}
@@ -89,6 +95,90 @@ func validateImage(next http.Handler, o ServerOptions) http.Handler {
 		if r.Method == "GET" && o.Mount == "" && o.EnableURLSource == false {
 			ErrorReply(r, w, ErrMethodNotAllowed, o)
 			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+type KeyValue struct {
+	Key string
+	Value string
+}
+
+func ParseQuery(query string) ([]KeyValue, error) {
+	var keyValueArray []KeyValue
+	err := parseQuery(&keyValueArray, query)
+	return keyValueArray, err
+}
+
+func parseQuery(keyValueArray *[]KeyValue, query string) (err error) {
+	for query != "" {
+		key := query
+		if i := strings.IndexAny(key, "&;"); i >= 0 {
+			key, query = key[:i], key[i+1:]
+		} else {
+			query = ""
+		}
+		if key == "" {
+			continue
+		}
+		value := ""
+		if i := strings.Index(key, "="); i >= 0 {
+			key, value = key[:i], key[i+1:]
+		}
+		key, err1 := url.QueryUnescape(key)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		value, err1 = url.QueryUnescape(value)
+		if err1 != nil {
+			if err == nil {
+				err = err1
+			}
+			continue
+		}
+		*keyValueArray = append(*keyValueArray, KeyValue{Key: key, Value: value})
+	}
+	return err
+}
+
+func validateToken(next http.Handler, o ServerOptions) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if r.Method == "GET" && isPublicPath(path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if r.Method == "GET" {
+			// a custom query parser is used in order to retain
+			// the query parameter order
+			keyValueArray, _ := ParseQuery(r.URL.RawQuery)
+			var paramsArray []string
+			token := ""
+			for _, kv := range keyValueArray {
+				if(kv.Key == "token") {
+					token = kv.Value
+				} else {
+					paramsArray = append(paramsArray, kv.Key + "=" + kv.Value)
+				}
+			}
+			urlWithoutToken := r.URL.Path + "?" + strings.Join(paramsArray, "&")
+			if token == "" {
+				ErrorReply(r, w, ErrSecureTokenMissing, o)
+				return
+			}
+			hasher := md5.New()
+			hasher.Write([]byte(o.SecretToken + urlWithoutToken))
+			expectedToken := hex.EncodeToString(hasher.Sum(nil))
+			if(token != expectedToken) {
+				ErrorReply(r, w, ErrSecureToken, o)
+				return
+			}
 		}
 
 		next.ServeHTTP(w, r)
