@@ -71,6 +71,7 @@ func NewServerMux(o ServerOptions) http.Handler {
 
 	image := ImageMiddleware(o)
 	mux.Handle(join(o, "/resize"), image(Resize))
+	mux.Handle(join(o, "/limit"), image(Limit))
 	mux.Handle(join(o, "/enlarge"), image(Enlarge))
 	mux.Handle(join(o, "/extract"), image(Extract))
 	mux.Handle(join(o, "/crop"), image(Crop))

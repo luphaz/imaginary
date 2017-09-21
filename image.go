@@ -75,6 +75,45 @@ func Resize(buf []byte, o ImageOptions) (Image, error) {
 	return Process(buf, opts)
 }
 
+func Limit(buf []byte, o ImageOptions) (Image, error) {
+	if o.Width == 0 && o.Height == 0 {
+		return Image{}, NewError("Missing required param: height or width", BadRequest)
+	}
+
+	opts := BimgOptions(o)
+	opts.Embed = true
+
+	if o.NoCrop == false {
+		opts.Crop = true
+	}
+
+	// If a single limit is defined, we duplicate the missing one from the other length
+	if o.Height == 0 {
+		opts.Height = o.Width
+	} else if o.Width == 0 {
+		opts.Width = o.Height
+	}
+
+	// We retrieve the size from BIMG call in order to properly limit the image according to his orientation
+	imageSize, err := bimg.Size(buf)
+	if err != nil {
+		return Image{}, NewError("Impossible to extract image size", InternalError)
+	}
+
+	// We compute height & width resize ratio in order to find which one if the smallest one
+	heightRatio := float64(opts.Height) / float64(imageSize.Height)
+	widthRatio := float64(opts.Width) / float64(imageSize.Width)
+
+	// We'll perform a single resize operation using the smallest ratio to ensure both limits are met
+	if widthRatio > heightRatio {
+		opts.Width = 0
+	} else {
+		opts.Height = 0
+	}
+
+	return Process(buf, opts)
+}
+
 func Enlarge(buf []byte, o ImageOptions) (Image, error) {
 	if o.Width == 0 || o.Height == 0 {
 		return Image{}, NewError("Missing required params: height, width", BadRequest)
